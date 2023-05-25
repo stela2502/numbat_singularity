@@ -1,0 +1,100 @@
+Bootstrap: debootstrap
+OSVersion: jammy
+MirrorURL: http://archive.ubuntu.com/ubuntu/
+
+%post
+  export PYTHONNOUSERSITE="true"
+  sed -i 's/main/main restricted universe/g' /etc/apt/sources.list
+  apt-get update
+  # Install R, Python, misc. utilities
+  apt-get install -y libopenblas-dev libcurl4-openssl-dev libopenmpi-dev openmpi-bin openmpi-common openmpi-doc openssh-client openssh-server libgeos-dev
+  
+  apt update --yes
+  apt install --yes build-essential \
+  libcurl4-gnutls-dev libxml2-dev libssl-dev libbz2-dev zlib1g-dev \
+  libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
+  libncurses5-dev libncursesw5-dev liblzma-dev \
+  libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
+  libglpk-dev git autoconf gettext libtool automake  \
+  samtools sudo
+  
+  apt-get install zip unzip
+
+  cd /usr/bin && \
+  wget https://github.com/samtools/htslib/releases/download/1.15.1/htslib-1.15.1.tar.bz2 && \
+  tar -vxjf htslib-1.15.1.tar.bz2 && cd htslib-1.15.1 && make && sudo make install
+
+  git clone https://github.com/single-cell-genetics/cellsnp-lite.git && cd cellsnp-lite && \
+  autoreconf -iv && ./configure && make && sudo make install 
+  
+  wget https://storage.googleapis.com/broad-alkesgroup-public/Eagle/downloads/Eagle_v2.4.1.tar.gz && cd .. && tar -xvzf Eagle_v2.4.1.tar.gz && cd Eagle_v2.4.1 && cp eagle /usr/bin
+  rm -Rf Eagle_v2.4.1*
+
+  # Install R
+  apt install -y --no-install-recommends software-properties-common dirmngr
+  wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | tee -a /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
+  add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
+
+  apt install -y r-base r-base-dev
+  R -e 'install.packages("BiocManager")'
+  R -e 'install.packages(c ("ragg", "pkgdown", "devtools" ))'
+  ## And finally the labbook
+  apt install pip
+  pip3 install --upgrade pip
+
+  pip3 install --upgrade --no-cache-dir -U numpy pybind11
+  pip3 install --upgrade --no-cache-dir -U dask[array] dask[distributed]
+  pip3 install --upgrade git+https://github.com/fraenkel-lab/pcst_fast.git
+  pip3 install --upgrade jupyterlab ipython-autotime
+
+  pip3 install --upgrade scikit-network
+  pip3 install --upgrade Sphinx sphinx-autodoc-typehints nbsphinx sphinx_rtd_theme
+
+  pip3 install --upgrade cellsnp-lite
+
+  pip3 install --upgrade procpath
+
+  ## the templates funnily are root read only and hence unusable
+
+  pip3 install --upgrade nbconvert
+
+  pip3 install jupyter_contrib_nbextensions
+
+ # cool integration method using PyTorch in the back.
+  pip3 install scvi-tools
+
+  R -e 'devtools::install_github("YuLab-SMU/ggtree")'
+  R -e 'install.packages(c( "scistreer"))'
+  R -e 'install.packages("numbat")'
+
+  wget https://raw.githubusercontent.com/kharchenkolab/numbat/main/inst/bin/pileup_and_phase.R -O /usr/bin/
+  chmod +x /usr/bin/pileup_and_phase.R
+
+  apt install -y jupyter
+  pip3 install jupyterlab --upgrade
+
+  R -e 'devtools::install_github("IRkernel/IRkernel")'
+  R -e 'IRkernel::installspec(user=FALSE)'
+
+
+  mkdir /data
+##  wget https://raw.githubusercontent.com/kharchenkolab/numbat/main/inst/bin/pileup_and_phase.R -O /opt/numbat/pileup_and_phase.R
+## The data download is now handled by the Makefile instead.
+
+  apt install -y jupyter 
+  pip3 install jupyterlab --upgrade
+
+  echo 'devtools::install_github("IRkernel/IRkernel")' > Install_IRkernel.R
+  echo 'IRkernel::installspec(user=FALSE)' >> Install_IRkernel.R
+  R CMD BATCH Install_IRkernel.R
+
+  mkdir /workspace
+  echo "jupyter lab --port 9734 --ip=0.0.0.0 --allow-root --no-browser" > /workspace/launch_jupyter.sh
+  chmod +x /workspace/launch_jupyter.sh
+
+%runscript
+  /workspace/launch_jupyter.sh
+
+%environment
+  export PATH=$PATH:/opt/salmon-1.9.0_linux_x86_64/bin:/opt/alevin-fry/
+  export PYTHONNOUSERSITE="true"

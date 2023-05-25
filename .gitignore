@@ -1,0 +1,6 @@
+*.sif
+*.swo
+/.ipynb_checkpoints/
+Eagle_v2.4.1*
+/numbat_data/
+/numbat_sandbox/
